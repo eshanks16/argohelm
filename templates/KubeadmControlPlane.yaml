@@ -63,6 +63,6 @@ spec:
     files:
     - path: /etc/tkg/pki/dex-ca.crt
       encoding: "gzip+base64"
-      content: |-
+      content: |
         {{ .Values.DEX_CA_CERT | nindent 8 | trim }}
   version: v1.18.6+vmware.1
