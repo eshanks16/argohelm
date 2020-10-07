@@ -1,0 +1,68 @@
+kind: KubeadmControlPlane
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+metadata:
+  name: {{ .Values.CLUSTER_NAME }}-control-plane
+spec:
+  replicas: {{ .Values.CONTROL_PLANE_MACHINE_COUNT }}
+  infrastructureTemplate:
+    kind: AWSMachineTemplate
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+    name: {{ .Values.CLUSTER_NAME }}-control-plane
+  kubeadmConfigSpec:
+    useExperimentalRetryJoin: true
+    initConfiguration:
+      nodeRegistration:
+        name: {{`'{{ ds.meta_data.local_hostname }}'`}}
+        kubeletExtraArgs:
+          cloud-provider: aws
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    clusterConfiguration:
+      imageRepository: registry.tkg.vmware.run
+      kubernetesVersion: {{ .Values.KUBERNETES_VERSION }}
+      etcd:
+        local:
+          dataDir: /var/lib/etcd
+          imageRepository: registry.tkg.vmware.run
+          imageTag: {{ .Values.TKG_ETCD_IMAGE_TAG }}
+          extraArgs:
+            cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+      dns:
+        type: CoreDNS
+        imageRepository: registry.tkg.vmware.run
+        imageTag: {{ .Values.TKG_COREDNS_IMAGE_TAG }}
+      apiServer:
+        timeoutForControlPlane: "8m0s"
+        extraArgs:
+          oidc-client-id: {{ .Values.CLUSTER_NAME }}
+          oidc-issuer-url: {{ .Values.OIDC_ISSUER_URL }}
+          oidc-username-claim: {{ .Values.OIDC_USERNAME_CLAIM }}
+          oidc-groups-claim: {{ .Values.OIDC_GROUPS_CLAIM }}
+          oidc-ca-file: /etc/tkg/pki/dex-ca.crt
+          cloud-provider: aws
+          # API server requires TLS_RSA_WITH_AES_256_GCM_SHA384 for ELB healthcheck
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384
+        extraVolumes:
+          - name: dex-ca
+            hostPath: /etc/tkg/pki
+            mountPath: /etc/tkg/pki
+            readOnly: true
+            pathType: DirectoryOrCreate
+      controllerManager:
+        extraArgs:
+          cloud-provider: aws
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+      scheduler:
+        extraArgs:
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    joinConfiguration:
+      nodeRegistration:
+        name: {{`'{{ ds.meta_data.local_hostname }}'`}}
+        kubeletExtraArgs:
+          cloud-provider: aws
+          tls-cipher-suites: TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+    files:
+    - path: /etc/tkg/pki/dex-ca.crt
+      encoding: "gzip+base64"
+      content: |-
+        {{ .Values.DEX_CA_CERT | nindent 8 | trim }}
+  version: v1.18.6+vmware.1
